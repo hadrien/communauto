@@ -1,0 +1,43 @@
+invoice: [title] header line* [footer]
+
+title: period invoice_id
+
+period: "Période du" INT "au" INT WORD year
+invoice_id: "Relevé" "#" ":" integer
+year: INT
+
+header: "No" "véh." "No" "usager" "Date" "début" "Date" "fin" "Nb" "jrs" "Nb" header1
+header1: "hres" "Prix" "temps" "Nb" "km" "Prix" "km" "Frais" "réserv."  "Frais/" header2
+header2: "Crédit" "Descr." "Total dû" "av. taxes" "Tarif" "appliqué" "Crédit" "achat"
+
+line: vehicle user start_date end_date days hours time_price km km_price fees credit+ [description+] total fare credit [note]
+
+footer: price integer price price price total price
+
+vehicle: integer
+user: integer
+start_date: date
+end_date: date
+days: integer
+hours: decimal
+time_price: price
+km: integer
+km_price: price
+fees: price
+credit: price
+total: price
+fare: WORD*
+description: "A(50)" | "C(20)" | "CLÉ" | "DAH" | "EDC" | "FA" | "G" | "LUM" | "MVS" | "P" | "RET" | "RET>30" | "UVS"
+note: "Note :" WORD+
+
+date: integer "/" integer integer ":" integer
+decimal: ["-"] integer | ["-"] integer ["€"] [integer] "," integer
+price: decimal "$"
+integer: INT
+
+UNICODE: /[0-9a-zA-Z¡-ÿ+=-_&!\-,()]/
+WORD: UNICODE+
+
+%import common.INT
+%import common.WS
+%ignore WS

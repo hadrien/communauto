@@ -1,11 +1,9 @@
 [tool.poetry]
 name = "communauto"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Hadrien David <hadrien@ectobal.com>"]
-packages = [
-    { include = "communauto/grammar.lark" },
-]
+
 
 [tool.poetry.dependencies]
 python = "^3.9"

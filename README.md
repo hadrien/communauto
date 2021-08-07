@@ -6,7 +6,7 @@ Output extracted data & estimates in csv format.
 ## Install using pip:
 
 ```
-$ pip install communato
+$ pip install communauto
 ```
 
 ## Usage

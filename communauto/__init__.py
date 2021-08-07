@@ -84,7 +84,9 @@ class Estimated(Line):
 
 def estimate(
     invoices: List[typer.FileBinaryRead],
-    output: typer.FileTextWrite = typer.Option("-"),
+    output: typer.FileTextWrite = typer.Option(
+        "-", help="Where to output result in csv format. Default to stdout."
+    ),
 ):
     lines = chain(*(extract_lines(invoice) for invoice in invoices))
     # only estimate the lines in invoice that actually were charged.

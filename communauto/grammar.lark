@@ -27,7 +27,7 @@ fees: price
 credit: price
 total: price
 fare: WORD*
-description: "A(50)" | "C(20)" | "CLÉ" | "DAH" | "EDC" | "FA" | "G" | "LUM" | "MVS" | "P" | "RET" | "RET>30" | "UVS"
+description: ANY
 note: "Note :" WORD+
 
 date: integer "/" integer integer ":" integer
@@ -35,8 +35,8 @@ decimal: ["-"] integer | ["-"] integer ["€"] [integer] "," integer
 price: decimal "$"
 integer: INT
 
-UNICODE: /[0-9a-zA-Z¡-ÿ+=-_&!\-,()]/
-WORD: UNICODE+
+ANY: /[0-9a-zA-Z¡-ÿ+=-_&!\-,()>]/
+WORD: ANY+
 
 %import common.INT
 %import common.WS

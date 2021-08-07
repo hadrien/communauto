@@ -1,4 +1,6 @@
+import csv
 import io
+import sys
 import warnings
 from collections import ChainMap
 from datetime import datetime
@@ -6,19 +8,20 @@ from decimal import Decimal
 from enum import Enum
 from importlib.resources import read_text
 from itertools import chain
-from typing import Iterable, List
+from typing import Dict, Iterable, List
 
 import pytz
 import typer
 import httpx
+import structlog
 from lark import Lark, Transformer
 from pydantic import BaseModel, root_validator
 from PyPDF3 import PdfFileReader
-from structlog import get_logger
 from tabulate import tabulate
 
+structlog.configure(logger_factory=lambda: structlog.PrintLogger(file=sys.stderr))
 warnings.filterwarnings("ignore")
-log = get_logger()
+log = structlog.get_logger()
 
 grammar = read_text("communauto", "grammar.lark")
 parser = Lark(grammar, start="invoice")
@@ -26,11 +29,6 @@ parser = Lark(grammar, start="invoice")
 
 class City(int, Enum):
     Montreal: int = 59
-
-
-class Language(str, Enum):
-    english: str = "en"
-    french: str = "fr"
 
 
 class Line(BaseModel):
@@ -71,36 +69,52 @@ class Rate(str, Enum):
         return mapping[self]
 
 
-class Estimate(BaseModel):
-    rate: Rate
-    total_cost: Decimal
+class Estimated(Line):
+    estimates: Dict[Rate, Decimal]
 
-    def __repr__(self):
-        return f"Estimate({self.rate.value} {self.total_cost}$)"
+    @staticmethod
+    def csv_fieldnames():
+        return list(Line.schema()["properties"].keys()) + list(Rate)
+
+    def csv_dict(self):
+        result = self.dict(exclude={"estimates"})
+        result.update({rate.value: self.estimates[rate] for rate in list(Rate)})
+        return result
 
 
-def estimate(invoices: List[typer.FileBinaryRead]):
+def estimate(
+    invoices: List[typer.FileBinaryRead],
+    output: typer.FileTextWrite = typer.Option("-"),
+):
     lines = chain(*(extract_lines(invoice) for invoice in invoices))
     # only estimate the lines in invoice that actually were charged.
-    lines = [line for line in lines if line.total_cost > Decimal(0)]
+    lines = filter(lambda line: line.total_cost > Decimal(0), lines)
 
     with httpx.Client() as client:
-        estimates = list(chain(*(estimate_trip(client, line) for line in lines)))
+        estimated_list = [estimate_line(client, line) for line in lines]
 
     result = {
         Rate.eco_extra: Decimal(0),
         Rate.eco_plus: Decimal(0),
         Rate.eco: Decimal(0),
     }
-    for estimate in estimates:
-        result[estimate.rate] += estimate.total_cost
+
+    writer = csv.DictWriter(output, Estimated.csv_fieldnames())
+    writer.writeheader()
+    for estimated in estimated_list:
+        writer.writerow(estimated.csv_dict())
+
+    for estimated in estimated_list:
+        for rate in result:
+            result[rate] += estimated.estimates[rate]
 
     print(
-        tabulate([k.value, v + k.total_cost(len(invoices))] for k, v in result.items())
+        tabulate([k.value, v + k.total_cost(len(invoices))] for k, v in result.items()),
+        file=sys.stderr,
     )
 
 
-def estimate_trip(client: httpx.Client, line: Line) -> Iterable[Estimate]:
+def estimate_line(client: httpx.Client, line: Line) -> Estimated:
     params = {
         "CityId": City.Montreal.value,
         "StartDate": line.start_date.isoformat(),
@@ -120,16 +134,20 @@ def estimate_trip(client: httpx.Client, line: Line) -> Iterable[Estimate]:
 
     data = res.json()
     # filter out flex estimates
-    estimates = list(
+    estimates_data = list(
         filter(
             lambda e: e["serviceType"] == "StationBased",
             data["tripPackageCostEstimateList"],
         )
-    )
-    for estimate, rate in zip(estimates[:3], [Rate.eco_extra, Rate.eco_plus, Rate.eco]):
-        estimate = Estimate(rate=rate, total_cost=estimate["totalCost"])
-        log.debug("estimated", line=line, estimate=estimate)
-        yield estimate
+    )[:3]
+    estimates = {
+        rate: estimate["totalCost"]
+        for estimate, rate in zip(
+            estimates_data, [Rate.eco_extra, Rate.eco_plus, Rate.eco]
+        )
+    }
+    log.debug("estimated", line=line, estimates=estimates)
+    return Estimated(estimates=estimates, **line.dict())
 
 
 def extract_lines(invoice: io.BufferedReader) -> Iterable[Line]:
@@ -148,7 +166,7 @@ def extract_lines(invoice: io.BufferedReader) -> Iterable[Line]:
         except Exception:
             log.error("Failed", info=info, tree=tree)
             raise
-        log.debug("extracted", lines=lines)
+        log.debug("extracted", length=len(lines), lines=lines)
         yield from lines
         year_value = transformer.year_value
 

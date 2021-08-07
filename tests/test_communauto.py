@@ -1,3 +1,5 @@
+import sys
+
 import httpx
 import respx
 from pytest import fixture
@@ -29,13 +31,7 @@ def test_extract_lines(pdf_invoice):
 def test_estimate(pdf_invoice):
     from communauto import estimate
 
-    estimate([pdf_invoice, pdf_invoice])
-
-
-def test_estimate_trip():
-    from communauto import estimate_trip
-
-    estimate_trip
+    estimate([pdf_invoice, pdf_invoice], sys.stdout)
 
 
 @respx.route(path="/api/v2/Billing/TripCostEstimate")

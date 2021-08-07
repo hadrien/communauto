@@ -1,8 +1,9 @@
 [tool.poetry]
 name = "communauto"
-version = "0.1.5"
+version = "0.1.6"
 description = ""
 authors = ["Hadrien David <hadrien@ectobal.com>"]
+repository = "https://github.com/hadrien/communauto"
 readme = "README.md"
 
 [tool.poetry.dependencies]
